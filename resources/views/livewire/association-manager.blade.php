@@ -7,7 +7,7 @@
                 Vue d'ensemble des associations, leurs statistiques et leur état actuel.
             </p>
         </div>
-        <div class="mt-4 sm:mt-0">
+        <div class="mt-4 sm:mt-0 flex items-center gap-2">
             <button wire:click="createAssociation"
                 class="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200">
                 <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16,6 +16,14 @@
                 </svg>
                 Nouvelle Association
             </button>
+
+            <a href="{{ route('associations.export.list', ['search' => $search ?? '', 'status' => $statusFilter ?? '', 'secteur' => $secteurFilter ?? '', 'district' => $districtFilter ?? '']) }}" target="_blank"
+               class="inline-flex items-center justify-center px-4 py-2 border border-red-600 shadow-sm text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-all duration-200">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10v6h-4v4H7z" />
+                </svg>
+                Exporter (PDF)
+            </a>
         </div>
     </div>
 
@@ -163,6 +171,14 @@
                         <option value="{{ $district->id }}">{{ $district->nom_district_fr }}</option>
                     @endforeach
                 </select>
+
+                <select wire:model.live="programmeFilter"
+                    class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm rounded-lg">
+                    <option value="">Tous les Programmes</option>
+                    @foreach ($programmes as $programme)
+                        <option value="{{ $programme->id }}">{{ $programme->name }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
     </div>
@@ -178,15 +194,24 @@
                         <th scope="col"
                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Coordonnées</th>
+                            <th scope="col"
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Président</th>
                         <th scope="col"
                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Secteur & District</th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Programmes</th>
                         <th scope="col"
                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Chiffres Clés</th>
                         <th scope="col"
                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Dossier</th>
+                        <th scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Durée</th>
                         <th scope="col"
                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Statut</th>
@@ -247,6 +272,18 @@
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    {{ $association->president_name ?? '-' }}
+                                </div>
+                                @if($association->president_email)
+                                    <div class="text-xs text-gray-500">{{ $association->president_email }}</div>
+                                @endif
+                                @if($association->president_cin)
+                                    <div class="text-xs text-gray-500">CIN: {{ $association->president_cin }}</div>
+                                @endif
+                            </td>
+
+                            <td class="px-6 py-4 whitespace-nowrap">
                                 <span
                                     class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
                                     {{ $association->secteur->nom_secteur_fr ?? 'Non défini' }}
@@ -255,7 +292,19 @@
                                     <span class="font-medium text-gray-700">District:</span>
                                     {{ $association->district->nom_district_fr ?? '-' }}
                                 </div>
-                              
+                                {{-- Programmes list shown as badges in next column --}}
+                            </td>
+
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                @if($association->programmes && $association->programmes->count())
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach($association->programmes as $programme)
+                                            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">{{ $programme->name }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                @endif
                             </td>
 
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -289,6 +338,48 @@
                                     <span class="text-xs text-gray-400">Aucun dossier</span>
                                 @endif
                             </td>
+
+                            <!-- Durée: difference between today and latest dossier due_date (Y M D) -->
+                            <td class="px-6 py-4 whitespace-wrap">
+                                @if($association->latestDossier && $association->latestDossier->due_date)
+                                    @php
+                                        $due = \Carbon\Carbon::parse($association->latestDossier->due_date);
+                                        $now = \Carbon\Carbon::now();
+                                        $interval = $now->diff($due);
+                                        $years = $interval->y;
+                                        $months = $interval->m;
+                                        $days = $interval->d;
+
+                                        $parts = [];
+                                        if ($years) { $parts[] = $years . ' ' . ($years > 1 ? 'ans' : 'an'); }
+                                        if ($months) { $parts[] = $months . ' mois'; }
+                                        if ($days) { $parts[] = $days . ' ' . ($days > 1 ? 'jours' : 'jour'); }
+                                        $label = implode(' ', $parts);
+                                    @endphp
+
+                                    @if($due->isToday())
+                                        <div class="text-sm text-yellow-600 font-medium">Aujourd'hui</div>
+                                    @elseif($due->isFuture())
+                                        <div class="text-sm text-green-700 font-medium">
+                                            @if($label)
+                                                {{ $label }} restants
+                                            @else
+                                                Aujourd'hui
+                                            @endif
+                                        </div>
+                                    @else
+                                        <div class="text-sm text-red-600 font-medium">
+                                            @if($label)
+                                                En retard de {{ $label }}
+                                            @else
+                                                Aujourd'hui
+                                            @endif
+                                        </div>
+                                    @endif
+                                @else
+                                    <span class="text-xs text-gray-400">N/A</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <button wire:click="toggleAssociationStatus({{ $association->id }})"
                                     class="focus:outline-none transition-transform active:scale-95">
@@ -306,7 +397,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <div class="flex justify-end gap-3">
                                     <button wire:click="editAssociation({{ $association->id }})"
-                                        class="text-gray-400 hover:text-emerald-600 transition-colors"
+                                        class="text-emerald-600 transition-colors"
                                         title="Modifier">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
@@ -317,7 +408,7 @@
                                     </button>
                                     <button wire:click="confirmDelete({{ $association->id }})"
                                         wire:confirm="Êtes-vous sûr de vouloir supprimer cette association ?"
-                                        class="text-gray-400 hover:text-red-600 transition-colors" title="Supprimer">
+                                        class=" text-red-600 transition-colors" title="Supprimer">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -330,7 +421,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center bg-white">
+                            <td colspan="10" class="px-6 py-12 text-center bg-white">
                                 <div class="flex flex-col items-center justify-center">
                                     <div
                                         class="h-14 w-14 rounded-full bg-gray-100 flex items-center justify-center mb-4">
@@ -466,6 +557,33 @@
                                         @enderror
                                     </div>
 
+                                    <div>
+                                        <label for="president_name" class="block text-sm font-medium text-gray-700">Président (Nom)</label>
+                                        <input type="text" id="president_name" wire:model="president_name"
+                                            class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
+                                        @error('president_name')
+                                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label for="president_email" class="block text-sm font-medium text-gray-700">Président (Email)</label>
+                                        <input type="email" id="president_email" wire:model="president_email"
+                                            class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
+                                        @error('president_email')
+                                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label for="president_cin" class="block text-sm font-medium text-gray-700">Président (CIN)</label>
+                                        <input type="text" id="president_cin" wire:model="president_cin"
+                                            class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
+                                        @error('president_cin')
+                                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
                                     <div class="lg:col-span-2">
                                         <label for="tel"
                                             class="block text-sm font-medium text-gray-700">Téléphone <span
@@ -520,6 +638,19 @@
                                             @endforeach
                                         </select>
                                         @error('districts_id')
+                                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div class="lg:col-span-3">
+                                        <label for="programme_ids" class="block text-sm font-medium text-gray-700">Programmes</label>
+                                        <select id="programme_ids" wire:model="programme_ids" multiple
+                                            class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
+                                            @foreach ($programmes as $programme)
+                                                <option value="{{ $programme->id }}">{{ $programme->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('programme_ids')
                                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                         @enderror
                                     </div>

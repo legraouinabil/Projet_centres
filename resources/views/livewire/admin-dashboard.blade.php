@@ -172,6 +172,14 @@
                                 </svg>
                             </div>
                         </button>
+                        <a href="{{ route('admin.journal') }}" class="w-full block text-left px-4 py-3 bg-yellow-50 hover:bg-yellow-100 rounded-md transition duration-150 ease-in-out">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-yellow-900">Journal d'activité</span>
+                                <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </div>
+                        </a>
                     </div>
                 </div>
             </div>

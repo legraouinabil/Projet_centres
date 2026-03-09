@@ -50,7 +50,11 @@
 <body class="bg-gray-50">
     <div id="app">
         <!-- Navigation -->
-        @include('layout.navigation')
+
+    @auth
+          @include('layout.navigation')
+    @endauth
+      
         <!-- Header Section -->
 
         <!-- Page Content -->

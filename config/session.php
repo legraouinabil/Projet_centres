@@ -34,6 +34,16 @@ return [
     'lifetime' => env('SESSION_LIFETIME', 120),
 
     'expire_on_close' => false,
+    /*
+    |--------------------------------------------------------------------------
+    | Inactivity Timeout (minutes)
+    |--------------------------------------------------------------------------
+    |
+    | This value determines how many minutes of inactivity (no requests)
+    | will cause the application to automatically log the user out.
+    |
+    */
+    'inactivity_timeout' => env('SESSION_INACTIVITY_TIMEOUT', 30),
 
     /*
     |--------------------------------------------------------------------------

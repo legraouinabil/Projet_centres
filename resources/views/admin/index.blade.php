@@ -6,4 +6,5 @@
     @livewire('admin-dashboard')
 
      @livewire('statistique')
+    
 @endsection

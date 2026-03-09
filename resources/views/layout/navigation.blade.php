@@ -8,12 +8,12 @@
                 @if (Auth::check() && Auth::user()->role === 'admin')
                     <a href="{{ route('admin.dashboard') }}" class="flex-shrink-0 flex items-center gap-2 group">
                         <img src="{{ asset('front/logo.png') }}" alt="Logo"
-                            class="h-9 w-auto transition-transform duration-300 group-hover:scale-105">
+                            class="h-12 w-auto transition-transform duration-300 group-hover:scale-105">
                     </a>
                 @else
                     <a href="{{ url('/') }}" class="flex-shrink-0 flex items-center gap-2 group">
                         <img src="{{ asset('front/logo.png') }}" alt="Logo"
-                            class="h-9 w-auto transition-transform duration-300 group-hover:scale-105">
+                            class="h-12 w-auto transition-transform duration-300 group-hover:scale-105">
                     </a>
                 @endif
 

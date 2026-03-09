@@ -6,6 +6,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Programme;
 
 class Association extends Model
 {
@@ -23,6 +25,9 @@ class Association extends Model
         'secteur_id',
         'districts_id',
         'email',
+        'president_name',
+        'president_email',
+        'president_cin',
         'site_web',
         'statut_juridique',
         'numero_agrement',
@@ -45,6 +50,14 @@ class Association extends Model
  public function centres()
     {
         return $this->belongsToMany(Centre::class, 'association_centre');
+    }
+    
+    /**
+     * Association - Programmes many-to-many
+     */
+    public function programmes(): BelongsToMany
+    {
+        return $this->belongsToMany(Programme::class, 'association_programme');
     }
     /**
      * Get the secteur that owns the association

@@ -9,7 +9,9 @@ use App\Models\Association;
 use App\Models\Secteur;
 use App\Models\District;
 use App\Models\Centre;
+use App\Models\Programme;
 use Illuminate\Support\Facades\Auth;
+use App\Helpers\ActivityLogger;
 
 class AssociationManager extends Component
 {
@@ -18,6 +20,7 @@ class AssociationManager extends Component
     public $search = '';
     public $secteurFilter = '';
     public $districtFilter = '';
+    public $programmeFilter = '';
     public $statusFilter = '';
     public $showAssociationModal = false;
     public $showDeleteModal = false;
@@ -33,6 +36,9 @@ class AssociationManager extends Component
     public $remarque = '';
     public $nombreBeneficiaire = 0;
     public $email = '';
+    public $president_name = '';
+    public $president_email = '';
+    public $president_cin = '';
     public $site_web = '';
     public $statut_juridique = '';
     public $numero_agrement = '';
@@ -41,6 +47,7 @@ class AssociationManager extends Component
     public $budget_annuel = 0;
     public $nombre_employes = 0;
     public $centre_ids = [];
+    public $programme_ids = [];
     public $secteur_id = '';
     public $districts_id = '';
     public $is_active = true;
@@ -53,6 +60,9 @@ class AssociationManager extends Component
         'date_de_creation' => 'required|date',
         'tel' => 'required|string|max:20',
         'email' => 'nullable|email',
+        'president_name' => 'nullable|string|max:255',
+        'president_email' => 'nullable|email',
+        'president_cin' => 'nullable|string|max:100',
         'site_web' => 'nullable|url',
         'statut_juridique' => 'nullable|string|max:255',
         'numero_agrement' => 'nullable|string|max:100',
@@ -65,6 +75,8 @@ class AssociationManager extends Component
         'districts_id' => 'required|exists:districts,id',
         'centre_ids' => 'array',
         'centre_ids.*' => 'exists:centres,id',
+        'programme_ids' => 'array',
+        'programme_ids.*' => 'exists:programmes,id',
         'is_active' => 'boolean',
     ];
 
@@ -83,9 +95,14 @@ class AssociationManager extends Component
         $this->resetPage();
     }
 
+    public function updatingProgrammeFilter()
+    {
+        $this->resetPage();
+    }
+
     public function getAssociationsProperty()
     {
-        return Association::with(['secteur', 'district', 'creator', 'latestDossier'])
+        return Association::with(['secteur', 'district', 'creator', 'latestDossier', 'programmes'])
             ->when($this->search, function ($query) {
                 $query->search($this->search);
             })
@@ -94,6 +111,11 @@ class AssociationManager extends Component
             })
             ->when($this->districtFilter, function ($query) {
                 $query->where('districts_id', $this->districtFilter);
+            })
+            ->when($this->programmeFilter, function ($query) {
+                $query->whereHas('programmes', function ($q) {
+                    $q->where('programmes.id', $this->programmeFilter);
+                });
             })
             ->when($this->statusFilter !== '', function ($query) {
                 $query->where('is_active', $this->statusFilter);
@@ -128,10 +150,14 @@ class AssociationManager extends Component
         $this->domaine_activite = $association->domaine_activite;
         $this->budget_annuel = $association->budget_annuel;
         $this->nombre_employes = $association->nombre_employes;
+        $this->president_name = $association->president_name;
+        $this->president_email = $association->president_email;
+        $this->president_cin = $association->president_cin;
         $this->secteur_id = $association->secteur_id;
         $this->districts_id = $association->districts_id;
         $this->is_active = $association->is_active;
         $this->centre_ids = $association->centres()->pluck('centres.id')->toArray();
+        $this->programme_ids = $association->programmes()->pluck('programmes.id')->toArray();
         $this->showAssociationModal = true;
     }
 
@@ -149,6 +175,9 @@ class AssociationManager extends Component
             'remarque' => $this->remarque,
             'nombreBeneficiaire' => $this->nombreBeneficiaire,
             'email' => $this->email,
+            'president_name' => $this->president_name,
+            'president_email' => $this->president_email,
+            'president_cin' => $this->president_cin,
             'site_web' => $this->site_web,
             'statut_juridique' => $this->statut_juridique,
             'numero_agrement' => $this->numero_agrement,
@@ -166,10 +195,16 @@ class AssociationManager extends Component
             $association = Association::find($this->associationId);
             $association->update($associationData);
             $association->centres()->sync($this->centre_ids ?? []);
+            $association->programmes()->sync($this->programme_ids ?? []);
+            // Log update
+            ActivityLogger::log('association.updated', $association, ['nom_de_l_asso' => $association->nom_de_l_asso]);
             session()->flash('message', 'Association updated successfully!');
         } else {
             $association = Association::create($associationData);
             $association->centres()->sync($this->centre_ids ?? []);
+            $association->programmes()->sync($this->programme_ids ?? []);
+            // Log creation
+            ActivityLogger::log('association.created', $association, ['nom_de_l_asso' => $association->nom_de_l_asso]);
             session()->flash('message', 'Association created successfully!');
         }
 
@@ -186,7 +221,10 @@ class AssociationManager extends Component
     public function deleteAssociation()
     {
         $association = Association::find($this->associationId);
+        // capture some data before deletion
+        $data = ['nom_de_l_asso' => $association->nom_de_l_asso, 'id' => $association->id];
         $association->delete();
+        ActivityLogger::log('association.deleted', null, $data);
         session()->flash('message', 'Association deleted successfully!');
         $this->showDeleteModal = false;
     }
@@ -196,8 +234,10 @@ class AssociationManager extends Component
         $association = Association::find($associationId);
         $association->update(['is_active' => !$association->is_active]);
         
-        $action = $association->is_active ? 'activated' : 'deactivated';
-        session()->flash('message', "Association {$action} successfully!");
+        $action = $association->is_active ? 'association.activated' : 'association.deactivated';
+        ActivityLogger::log($action, $association, ['is_active' => $association->is_active]);
+        $label = $association->is_active ? 'activée' : 'désactivée';
+        session()->flash('message', "Association {$label} successfully!");
     }
 
     public function resetAssociationForm()
@@ -205,9 +245,9 @@ class AssociationManager extends Component
         $this->reset([
             'associationId', 'nom_asso_ar', 'nom_de_l_asso', 'adresse', 'jeagraphie',
             'date_de_creation', 'tel', 'remarque', 'nombreBeneficiaire', 'email',
-            'site_web', 'statut_juridique', 'numero_agrement', 'date_agrement',
+            'president_name', 'president_email', 'president_cin', 'site_web', 'statut_juridique', 'numero_agrement', 'date_agrement',
             'domaine_activite', 'budget_annuel', 'nombre_employes', 'secteur_id',
-            'districts_id', 'is_active', 'centre_ids'
+            'districts_id', 'is_active', 'centre_ids', 'programme_ids'
         ]);
     }
 
@@ -218,6 +258,7 @@ class AssociationManager extends Component
             'secteurs' => Secteur::active()->get(),
             'districts' => District::active()->get(),
             'centres' => Centre::orderBy('denomination')->get(),
+            'programmes' => Programme::orderBy('name')->get(),
             'totalAssociations' => Association::count(),
             'activeAssociations' => Association::where('is_active', true)->count(),
             'totalBeneficiaires' => Association::sum('nombreBeneficiaire'),

@@ -11,6 +11,7 @@ use App\Models\ImpactAnimation;
 use App\Models\ImpactHandicap;
 use App\Models\ImpactEps;
 use Illuminate\Support\Facades\DB;
+use App\Models\Partenaire;
 
 class GestionImpacts extends Component
 {
@@ -42,8 +43,20 @@ class GestionImpacts extends Component
     public $showPartenairesModal = false;
     public $isEditing = false;
     
+    // Champs partenaire (modal)
+    public $partenaire_nom;
+    public $partenaire_evenements = 0;
+    public $partenaire_participations = 0;
+    public $partenaire_trophies = 0;
+    
     // Impact sélectionné
     public $selectedImpact = null;
+    // Message de succès affiché immédiatement pour Livewire
+    public $successMessage = null;
+    // Livewire listeners
+    protected $listeners = [
+        'clearSuccess' => 'clearSuccess',
+    ];
 
     protected $rules = [
         'centre_id' => 'required|exists:centres,id',
@@ -185,6 +198,7 @@ class GestionImpacts extends Component
 
             $this->resetForm();
             session()->flash('success', 'Impact bénéficiaire créé avec succès.');
+            $this->successMessage = 'Impact bénéficiaire créé avec succès.';
         });
     }
 
@@ -213,6 +227,7 @@ class GestionImpacts extends Component
 
             $this->resetForm();
             session()->flash('success', 'Impact bénéficiaire modifié avec succès.');
+            $this->successMessage = 'Impact bénéficiaire modifié avec succès.';
         });
     }
 
@@ -342,6 +357,7 @@ class GestionImpacts extends Component
         $impact->delete();
         
         session()->flash('success', 'Impact bénéficiaire supprimé avec succès.');
+        $this->successMessage = 'Impact bénéficiaire supprimé avec succès.';
     }
 
     public function resetForm()
@@ -355,6 +371,63 @@ class GestionImpacts extends Component
         ]);
         $this->initializeDonneesSpecifiques();
         $this->selectedImpact = null;
+        $this->resetPartenaireForm();
+    }
+
+    private function resetPartenaireForm()
+    {
+        $this->reset(['partenaire_nom', 'partenaire_evenements', 'partenaire_participations', 'partenaire_trophies']);
+        $this->resetErrorBag();
+    }
+
+    public function savePartenaire()
+    {
+        $this->validate([
+            'partenaire_nom' => 'required|string|max:255',
+            'partenaire_evenements' => 'nullable|integer|min:0',
+            'partenaire_participations' => 'nullable|integer|min:0',
+            'partenaire_trophies' => 'nullable|integer|min:0',
+        ]);
+
+        if (! $this->selectedImpact) {
+            $this->addError('selectedImpact', 'Aucun impact sélectionné.');
+            return;
+        }
+
+        // Create partenaire with the fields available in the table (nom + impact_beneficiaire_id).
+        Partenaire::create([
+            'impact_beneficiaire_id' => $this->selectedImpact->id,
+            'nom' => $this->partenaire_nom,
+        ]);
+
+        // Refresh selected impact to include new partenaire
+        $this->selectedImpact = $this->selectedImpact->fresh('partenaires');
+
+        $this->resetPartenaireForm();
+        $this->showPartenairesModal = false;
+
+        session()->flash('success', 'Partenaire ajouté avec succès.');
+        $this->successMessage = 'Partenaire ajouté avec succès.';
+    }
+
+    public function deletePartenaire($id)
+    {
+        $partenaire = Partenaire::findOrFail($id);
+        $partenaire->delete();
+
+        // Refresh selected impact partenaires
+        if ($this->selectedImpact) {
+            $this->selectedImpact = $this->selectedImpact->fresh('partenaires');
+        }
+
+        session()->flash('success', 'Partenaire supprimé avec succès.');
+        $this->successMessage = 'Partenaire supprimé avec succès.';
+    }
+
+    // Clear transient success message (called from client after timeout)
+    public function clearSuccess()
+    {
+        $this->successMessage = null;
     }
 
     public function getImpactsQueryProperty()

@@ -149,4 +149,73 @@ class ReportExportController extends Controller
             default => $value
         };
     }
+
+    // Export Ressources Humaines filtered list to PDF
+    public function exportRessourcesHumaines(Request $request)
+    {
+        $query = RessourceHumaine::with('centre');
+
+        if ($request->filled('search')) {
+            $s = $request->input('search');
+            $query->where(function($q) use ($s) {
+                $q->where('nom_prenom', 'like', '%'.$s.'%')
+                  ->orWhere('poste', 'like', '%'.$s.'%');
+            });
+        }
+
+        if ($request->filled('centre_id')) {
+            $query->where('centre_id', $request->input('centre_id'));
+        }
+
+        if ($request->filled('type_contrat')) {
+            $query->where('type_contrat', $request->input('type_contrat'));
+        }
+
+        $rhs = $query->orderBy('nom_prenom')->get();
+
+        $pdf = Pdf::loadView('exportressorce', ['rhs' => $rhs, 'filters' => $request->only(['search','centre_id','type_contrat'])]);
+        return $pdf->download('ressources_humaines_'.now()->format('Ymd_His').'.pdf');
+    }
+
+    // Export Ressources Financières filtered list to PDF
+    public function exportRessourcesFinancieres(Request $request)
+    {
+        $query = RessourceFinanciere::with('centre');
+
+        if ($request->filled('search')) {
+            $s = $request->input('search');
+            $query->whereHas('centre', function($q) use ($s) {
+                $q->where('denomination', 'like', '%'.$s.'%')
+                  ->orWhere('localisation', 'like', '%'.$s.'%');
+            });
+        }
+
+        if ($request->filled('selectedYear')) {
+            $query->where('budget_annee', $request->input('selectedYear'));
+        }
+
+        $rfs = $query->orderBy('budget_annee', 'desc')->get();
+
+        $pdf = Pdf::loadView('exportfinance', ['rfs' => $rfs, 'filters' => $request->only(['search','selectedYear'])]);
+        return $pdf->download('ressources_financieres_'.now()->format('Ymd_His').'.pdf');
+    }
+
+    // Export all centres list to PDF
+    public function exportCentresPdf(Request $request)
+    {
+        $query = Centre::with('associations');
+
+        if ($request->filled('search')) {
+            $s = $request->input('search');
+            $query->where(function($q) use ($s) {
+                $q->where('denomination', 'like', '%'.$s.'%')
+                  ->orWhere('localisation', 'like', '%'.$s.'%');
+            });
+        }
+
+        $centres = $query->orderBy('denomination')->get();
+
+        $pdf = Pdf::loadView('exports.centres-pdf', ['centres' => $centres, 'date' => now()->format('d/m/Y')]);
+        return $pdf->download('centres_'.now()->format('Ymd_His').'.pdf');
+    }
 }

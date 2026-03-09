@@ -10,9 +10,7 @@
             <!-- Graphique 1: Pie Chart -->
             <div class="bg-white p-5 rounded-xl shadow">
                 <div class="flex items-center mb-4">
-                    <div class="bg-blue-100 p-2 rounded-lg mr-3">
-                        <span class="text-blue-600 text-xl">🥧</span>
-                    </div>
+                    
                     <div>
                         <h3 class="font-bold text-lg text-gray-800">Répartition par Domaine</h3>
                         <p class="text-sm text-gray-500">Graphique circulaire</p>
@@ -26,9 +24,7 @@
             <!-- Graphique 2: Bar Chart -->
             <div class="bg-white p-5 rounded-xl shadow">
                 <div class="flex items-center mb-4">
-                    <div class="bg-green-100 p-2 rounded-lg mr-3">
-                        <span class="text-green-600 text-xl">📊</span>
-                    </div>
+                    
                     <div>
                         <h3 class="font-bold text-lg text-gray-800">Top 8 Centres</h3>
                         <p class="text-sm text-gray-500">Classement par bénéficiaires</p>
@@ -42,9 +38,7 @@
             <!-- Graphique 3: Line Chart -->
             <div class="bg-white p-5 rounded-xl shadow">
                 <div class="flex items-center mb-4">
-                    <div class="bg-red-100 p-2 rounded-lg mr-3">
-                        <span class="text-red-600 text-xl">📈</span>
-                    </div>
+                   
                     <div>
                         <h3 class="font-bold text-lg text-gray-800">Évolution 5 Ans</h3>
                         <p class="text-sm text-gray-500">Tendance temporelle</p>
@@ -58,9 +52,7 @@
             <!-- Graphique 4: Doughnut Chart -->
             <div class="bg-white p-5 rounded-xl shadow">
                 <div class="flex items-center mb-4">
-                    <div class="bg-purple-100 p-2 rounded-lg mr-3">
-                        <span class="text-purple-600 text-xl">🍩</span>
-                    </div>
+                   
                     <div>
                         <h3 class="font-bold text-lg text-gray-800">Répartition Genre</h3>
                         <p class="text-sm text-gray-500">Hommes vs Femmes</p>
@@ -74,9 +66,7 @@
             <!-- Graphique 5: Radar Chart -->
             <div class="bg-white p-5 rounded-xl shadow">
                 <div class="flex items-center mb-4">
-                    <div class="bg-yellow-100 p-2 rounded-lg mr-3">
-                        <span class="text-yellow-600 text-xl">⭐</span>
-                    </div>
+                   
                     <div>
                         <h3 class="font-bold text-lg text-gray-800">Performance Globale</h3>
                         <p class="text-sm text-gray-500">Indicateurs clés vs Cibles</p>
@@ -90,9 +80,7 @@
             <!-- Graphique 6: Grouped Bar Chart -->
             <div class="bg-white p-5 rounded-xl shadow md:col-span-2 lg:col-span-1">
                 <div class="flex items-center mb-4">
-                    <div class="bg-indigo-100 p-2 rounded-lg mr-3">
-                        <span class="text-indigo-600 text-xl">📋</span>
-                    </div>
+                   
                     <div>
                         <h3 class="font-bold text-lg text-gray-800">Comparaison Domaine</h3>
                         <p class="text-sm text-gray-500">Métriques par activité</p>

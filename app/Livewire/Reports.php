@@ -1,297 +1,411 @@
 <?php
-// app/Livewire/ReportCentreImpactFinance.php
+// app/Livewire/ReportRessourcesFinancieres.php
 namespace App\Livewire;
 
-use Livewire\Component;
-use App\Models\Centre;
-use App\Models\ImpactBeneficiaire;
 use App\Models\RessourceFinanciere;
+use App\Models\Centre;
+use Livewire\Component;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
+use Carbon\Carbon;
 
 class Reports extends Component
 {
-    // Données
-    public $centres = [];
-    public $centresStats = [];
-    public $globalStats = [];
-    public $comparisonStats = [];
-    public $performanceStats = [];
-    public $impactStats = [];
-    public $financeStats = [];
+    // Data properties
+    public array $stats = [];
+    public array $centresStats = [];
+    public array $evolutionStats = [];
+    
+    // 4 Different Charts
+    public array $barChart = [];          // Bar Chart: Annual comparison
+    public array $doughnutChart = [];     // Doughnut Chart: Budget distribution by category
+    public array $pieChart = [];          // Pie Chart: Center performance distribution
+    public array $lineChart = [];         // Line Chart: Trend analysis
+    
+    // Centers list
+    public Collection $centres;
+    
+    // Chart configuration
+    private const CHART_COLORS = [
+        'primary' => ['#3b82f6', '#1d4ed8', '#60a5fa', '#93c5fd'], // Blue shades
+        'success' => ['#10b981', '#059669', '#34d399', '#6ee7b7'], // Green shades
+        'warning' => ['#f59e0b', '#d97706', '#fbbf24', '#fcd34d'], // Amber shades
+        'danger'  => ['#ef4444', '#dc2626', '#f87171', '#fca5a5'], // Red shades
+        'purple'  => ['#8b5cf6', '#7c3aed', '#a78bfa', '#c4b5fd'], // Purple shades
+        'pink'    => ['#ec4899', '#db2777', '#f472b6', '#f9a8d4'], // Pink shades
+    ];
 
-    public function mount()
+    public function mount(): void
     {
         $this->centres = Centre::orderBy('denomination')->get();
         $this->loadAllData();
     }
 
-    public function loadAllData()
+    public function loadAllData(): void
     {
-        // Statistiques globales
-        $totalCentres = Centre::count();
-        $totalBeneficiaires = ImpactBeneficiaire::sum(DB::raw('nombre_inscrits_hommes + nombre_inscrits_femmes'));
-        $totalRecettes = RessourceFinanciere::sum('total_recettes');
-        $totalDepenses = RessourceFinanciere::sum('total_depenses');
+        $this->loadGlobalStats();
+        $this->loadCentresStats();
+        $this->loadEvolutionStats();
+        $this->loadBarChart();
+        $this->loadDoughnutChart();
+        $this->loadPieChart();
+        $this->loadLineChart();
+    }
+    
+    private function loadGlobalStats(): void
+    {
+        $aggregates = RessourceFinanciere::select([
+                DB::raw('SUM(total_recettes) as total_recettes'),
+                DB::raw('SUM(total_depenses) as total_depenses'),
+                DB::raw('AVG(total_recettes) as moyenne_recettes'),
+                DB::raw('AVG(total_depenses) as moyenne_depenses'),
+                DB::raw('AVG(total_recettes - total_depenses) as moyenne_solde'),
+                DB::raw('MAX(total_recettes) as max_recettes'),
+                DB::raw('MIN(total_recettes) as min_recettes'),
+                DB::raw('COUNT(DISTINCT budget_annee) as total_annees'),
+                DB::raw('COUNT(DISTINCT centre_id) as total_centres'),
+                DB::raw('COUNT(*) as total_entries'),
+            ])
+            ->first();
         
-        $this->globalStats = [
-            'total_centres' => $totalCentres,
-            'total_beneficiaires' => $totalBeneficiaires,
+        $totalRecettes = (float) ($aggregates->total_recettes ?? 0);
+        $totalDepenses = (float) ($aggregates->total_depenses ?? 0);
+        
+        $this->stats = [
             'total_recettes' => $totalRecettes,
             'total_depenses' => $totalDepenses,
             'solde_global' => $totalRecettes - $totalDepenses,
-            'taux_depenses' => $totalRecettes > 0 ? round(($totalDepenses / $totalRecettes) * 100, 1) : 0,
-            'taux_feminisation' => $totalBeneficiaires > 0 ? 
-                round((ImpactBeneficiaire::sum('nombre_inscrits_femmes') / $totalBeneficiaires) * 100, 1) : 0,
-            'cout_moyen_beneficiaire' => $totalBeneficiaires > 0 ? 
-                round(ImpactBeneficiaire::sum('charges_globales') / $totalBeneficiaires, 0) : 0,
+            'taux_depenses' => $this->calculatePercentage($totalDepenses, $totalRecettes),
+            'moyenne_recettes' => (float) ($aggregates->moyenne_recettes ?? 0),
+            'moyenne_depenses' => (float) ($aggregates->moyenne_depenses ?? 0),
+            'moyenne_solde' => (float) ($aggregates->moyenne_solde ?? 0),
+            'max_recettes' => (float) ($aggregates->max_recettes ?? 0),
+            'min_recettes' => (float) ($aggregates->min_recettes ?? 0),
+            'total_annees' => (int) ($aggregates->total_annees ?? 0),
+            'total_centres' => (int) ($aggregates->total_centres ?? 0),
+            'total_entries' => (int) ($aggregates->total_entries ?? 0),
         ];
-        
-        // Statistiques détaillées par centre
-        $this->centresStats = $this->getCentresDetailedStats();
-        
-        // Statistiques d'impact agrégées
-        $this->impactStats = $this->getImpactStats();
-        
-        // Statistiques financières agrégées
-        $this->financeStats = $this->getFinanceStats();
-        
-        // Statistiques de comparaison
-        $this->comparisonStats = $this->getComparisonStats();
-        
-        // Statistiques de performance
-        $this->performanceStats = $this->getPerformanceStats();
     }
     
-    private function getCentresDetailedStats()
+    private function loadCentresStats(): void
     {
-        $centres = Centre::withCount('impactBeneficiaires')
-            ->withCount('ressourceFinancieres')
-            ->get();
-        
-        return $centres->map(function($centre) {
-            // Statistiques d'impact
-            $impactStats = ImpactBeneficiaire::where('centre_id', $centre->id)
-                ->select(
-                    DB::raw('COUNT(*) as total_impacts'),
-                    DB::raw('SUM(nombre_inscrits_hommes + nombre_inscrits_femmes) as total_beneficiaires'),
-                    DB::raw('SUM(nombre_inscrits_hommes) as hommes'),
-                    DB::raw('SUM(nombre_inscrits_femmes) as femmes'),
-                    DB::raw('SUM(charges_globales) as total_charges'),
-                    DB::raw('AVG(heures_par_beneficiaire) as heures_moyennes')
-                )->first();
-            
-            // Statistiques financières
-            $financeStats = RessourceFinanciere::where('centre_id', $centre->id)
-                ->select(
-                    DB::raw('COUNT(*) as total_annees'),
-                    DB::raw('SUM(total_recettes) as total_recettes'),
-                    DB::raw('SUM(total_depenses) as total_depenses'),
-                    DB::raw('AVG(total_recettes) as moyenne_recettes'),
-                    DB::raw('AVG(total_depenses) as moyenne_depenses')
-                )->first();
-            
-            // Calculs
-            $totalBeneficiaires = $impactStats->total_beneficiaires ?? 0;
-            $totalRecettes = $financeStats->total_recettes ?? 0;
-            $totalDepenses = $financeStats->total_depenses ?? 0;
-            $solde = $totalRecettes - $totalDepenses;
-            
-            return [
-                'id' => $centre->id,
-                'nom' => $centre->denomination,
-                'code' => $centre->code ?? 'N/A',
-                'ville' => $centre->ville ?? 'Non spécifié',
+        $this->centresStats = RessourceFinanciere::with('centre:id,denomination')
+            ->select([
+                'centre_id',
+                DB::raw('SUM(total_recettes) as total_recettes'),
+                DB::raw('SUM(total_depenses) as total_depenses'),
+                DB::raw('SUM(total_recettes - total_depenses) as solde'),
+                DB::raw('AVG(total_recettes) as moyenne_recettes'),
+                DB::raw('COUNT(*) as nombre_entrees'),
+            ])
+            ->groupBy('centre_id')
+            ->orderByDesc('total_recettes')
+            ->limit(15)
+            ->get()
+            ->map(function ($item) {
+                $recettes = (float) $item->total_recettes;
+                $depenses = (float) $item->total_depenses;
                 
-                // Impact
-                'total_impacts' => $impactStats->total_impacts ?? 0,
-                'total_beneficiaires' => $totalBeneficiaires,
-                'hommes' => $impactStats->hommes ?? 0,
-                'femmes' => $impactStats->femmes ?? 0,
-                'taux_feminisation' => $totalBeneficiaires > 0 ? 
-                    round(($impactStats->femmes / $totalBeneficiaires) * 100, 1) : 0,
-                'total_charges' => $impactStats->total_charges ?? 0,
-                'cout_moyen' => $totalBeneficiaires > 0 ? 
-                    round($impactStats->total_charges / $totalBeneficiaires, 0) : 0,
-                'heures_moyennes' => round($impactStats->heures_moyennes ?? 0, 1),
+                return [
+                    'centre_id' => $item->centre_id,
+                    'centre_name' => $item->centre?->denomination ?? 'Inconnu',
+                    'total_recettes' => $recettes,
+                    'total_depenses' => $depenses,
+                    'solde' => (float) $item->solde,
+                    'moyenne_recettes' => (float) $item->moyenne_recettes,
+                    'nombre_entrees' => (int) $item->nombre_entrees,
+                    'taux_depenses' => $this->calculatePercentage($depenses, $recettes),
+                    'efficiency' => $recettes > 0 ? (($recettes - $depenses) / $recettes) * 100 : 0,
+                ];
+            })
+            ->toArray();
+    }
+    
+    private function loadEvolutionStats(): void
+    {
+        $this->evolutionStats = RessourceFinanciere::select([
+                'budget_annee',
+                DB::raw('SUM(total_recettes) as total_recettes'),
+                DB::raw('SUM(total_depenses) as total_depenses'),
+                DB::raw('SUM(total_recettes - total_depenses) as solde'),
+                DB::raw('AVG(total_recettes) as moyenne_recettes'),
+                DB::raw('AVG(total_depenses) as moyenne_depenses'),
+                DB::raw('COUNT(DISTINCT centre_id) as nombre_centres'),
+            ])
+            ->groupBy('budget_annee')
+            ->orderBy('budget_annee')
+            ->get()
+            ->map(function ($item) {
+                $recettes = (float) $item->total_recettes;
+                $depenses = (float) $item->total_depenses;
                 
-                // Finance
-                'total_annees' => $financeStats->total_annees ?? 0,
-                'total_recettes' => $totalRecettes,
-                'total_depenses' => $totalDepenses,
-                'solde' => $solde,
-                'taux_depenses' => $totalRecettes > 0 ? 
-                    round(($totalDepenses / $totalRecettes) * 100, 1) : 0,
-                'moyenne_recettes' => round($financeStats->moyenne_recettes ?? 0, 0),
-                'moyenne_depenses' => round($financeStats->moyenne_depenses ?? 0, 0),
-                
-                // Performance
-                'score_impact' => $this->calculateImpactScore($impactStats),
-                'score_finance' => $this->calculateFinanceScore($financeStats),
-                'score_global' => 0, // Calculé plus bas
-                
-                // Métadonnées
-                'has_impact' => ($impactStats->total_impacts ?? 0) > 0,
-                'has_finance' => ($financeStats->total_annees ?? 0) > 0,
-                'status' => $this->getCentreStatus($solde, $totalBeneficiaires)
+                return [
+                    'annee' => (int) $item->budget_annee,
+                    'total_recettes' => $recettes,
+                    'total_depenses' => $depenses,
+                    'solde' => (float) $item->solde,
+                    'moyenne_recettes' => (float) $item->moyenne_recettes,
+                    'moyenne_depenses' => (float) $item->moyenne_depenses,
+                    'nombre_centres' => (int) $item->nombre_centres,
+                    'taux_depenses' => $this->calculatePercentage($depenses, $recettes),
+                ];
+            })
+            ->toArray();
+    }
+    
+    // CHART 1: Bar Chart - Annual Comparison
+    private function loadBarChart(): void
+    {
+        if (count($this->evolutionStats) === 0) {
+            $this->barChart = [
+                'labels' => [],
+                'datasets' => []
             ];
-        })->map(function($centre) {
-            // Calcul du score global (moyenne pondérée)
-            $centre['score_global'] = round(
-                ($centre['score_impact'] * 0.6) + ($centre['score_finance'] * 0.4), 
-                1
-            );
-            return $centre;
-        })->sortByDesc('score_global')
-          ->values()
-          ->toArray();
-    }
-    
-    private function calculateImpactScore($impactStats)
-    {
-        if (!$impactStats || $impactStats->total_impacts == 0) return 0;
-        
-        $score = 0;
-        
-        // Nombre de bénéficiaires (max 40 points)
-        $score += min(40, ($impactStats->total_beneficiaires / 100) * 4);
-        
-        // Taux de féminisation (max 30 points)
-        $tauxFemmes = $impactStats->total_beneficiaires > 0 ? 
-            ($impactStats->femmes / $impactStats->total_beneficiaires) * 100 : 0;
-        $score += min(30, $tauxFemmes * 0.3);
-        
-        // Heures moyennes (max 30 points)
-        $score += min(30, ($impactStats->heures_moyennes ?? 0) * 0.3);
-        
-        return round($score, 1);
-    }
-    
-    private function calculateFinanceScore($financeStats)
-    {
-        if (!$financeStats || $financeStats->total_annees == 0) return 0;
-        
-        $score = 0;
-        
-        // Solde positif (max 40 points)
-        $solde = ($financeStats->total_recettes ?? 0) - ($financeStats->total_depenses ?? 0);
-        if ($solde > 0) {
-            $score += min(40, ($solde / max(1, $financeStats->total_recettes)) * 100);
+            return;
         }
         
-        // Contrôle des dépenses (max 40 points)
-        $tauxDepenses = ($financeStats->total_recettes ?? 0) > 0 ? 
-            (($financeStats->total_depenses ?? 0) / $financeStats->total_recettes) * 100 : 0;
-        $score += min(40, max(0, 100 - $tauxDepenses) * 0.4);
+        $labels = array_column($this->evolutionStats, 'annee');
+        $recettes = array_column($this->evolutionStats, 'total_recettes');
+        $depenses = array_column($this->evolutionStats, 'total_depenses');
+        $soldes = array_column($this->evolutionStats, 'solde');
         
-        // Stabilité (nombre d'années) (max 20 points)
-        $score += min(20, ($financeStats->total_annees ?? 0) * 4);
-        
-        return round($score, 1);
-    }
-    
-    private function getCentreStatus($solde, $beneficiaires)
-    {
-        if ($beneficiaires == 0) return 'inactif';
-        if ($solde < 0) return 'deficitaire';
-        if ($solde > 0 && $beneficiaires > 100) return 'excellent';
-        if ($solde >= 0 && $beneficiaires > 50) return 'bon';
-        return 'moyen';
-    }
-    
-    private function getImpactStats()
-    {
-        $stats = ImpactBeneficiaire::select(
-            DB::raw('COUNT(DISTINCT centre_id) as centres_actifs'),
-            DB::raw('SUM(nombre_inscrits_hommes + nombre_inscrits_femmes) as total_beneficiaires'),
-            DB::raw('AVG(nombre_inscrits_hommes + nombre_inscrits_femmes) as moyenne_par_centre'),
-            DB::raw('SUM(charges_globales) as total_charges'),
-            DB::raw('AVG(charges_globales) as charges_moyennes'),
-            DB::raw('AVG(heures_par_beneficiaire) as heures_moyennes')
-        )->first();
-        
-        return [
-            'centres_actifs' => $stats->centres_actifs ?? 0,
-            'total_beneficiaires' => $stats->total_beneficiaires ?? 0,
-            'moyenne_par_centre' => round($stats->moyenne_par_centre ?? 0, 1),
-            'total_charges' => $stats->total_charges ?? 0,
-            'charges_moyennes' => round($stats->charges_moyennes ?? 0, 0),
-            'heures_moyennes' => round($stats->heures_moyennes ?? 0, 1)
-        ];
-    }
-    
-    private function getFinanceStats()
-    {
-        $stats = RessourceFinanciere::select(
-            DB::raw('COUNT(DISTINCT centre_id) as centres_finances'),
-            DB::raw('AVG(total_recettes) as moyenne_recettes'),
-            DB::raw('AVG(total_depenses) as moyenne_depenses'),
-            DB::raw('SUM(total_recettes - total_depenses) as solde_total'),
-            DB::raw('AVG(total_recettes - total_depenses) as solde_moyen'),
-            DB::raw('AVG((total_depenses / NULLIF(total_recettes, 0)) * 100) as taux_depenses_moyen')
-        )->first();
-        
-        return [
-            'centres_finances' => $stats->centres_finances ?? 0,
-            'moyenne_recettes' => round($stats->moyenne_recettes ?? 0, 0),
-            'moyenne_depenses' => round($stats->moyenne_depenses ?? 0, 0),
-            'solde_total' => $stats->solde_total ?? 0,
-            'solde_moyen' => round($stats->solde_moyen ?? 0, 0),
-            'taux_depenses_moyen' => round($stats->taux_depenses_moyen ?? 0, 1)
-        ];
-    }
-    
-    private function getComparisonStats()
-    {
-        $centres = collect($this->centresStats);
-        
-        return [
-            'labels' => $centres->pluck('nom')->take(8)->toArray(),
+        $this->barChart = [
+            'labels' => $labels,
             'datasets' => [
                 [
-                    'label' => 'Bénéficiaires',
-                    'data' => $centres->pluck('total_beneficiaires')->take(8)->toArray(),
-                    'backgroundColor' => 'rgba(54, 162, 235, 0.7)'
+                    'label' => 'Recettes',
+                    'data' => $recettes,
+                    'backgroundColor' => self::CHART_COLORS['success'][0],
+                    'borderColor' => self::CHART_COLORS['success'][1],
+                    'borderWidth' => 2,
+                    'borderRadius' => 6,
+                    'borderSkipped' => false,
                 ],
                 [
-                    'label' => 'Recettes (k DH)',
-                    'data' => $centres->pluck('total_recettes')->take(8)->map(function($v) {
-                        return $v / 1000;
-                    })->toArray(),
-                    'backgroundColor' => 'rgba(75, 192, 192, 0.7)'
+                    'label' => 'Dépenses',
+                    'data' => $depenses,
+                    'backgroundColor' => self::CHART_COLORS['danger'][0],
+                    'borderColor' => self::CHART_COLORS['danger'][1],
+                    'borderWidth' => 2,
+                    'borderRadius' => 6,
+                    'borderSkipped' => false,
+                ],
+                [
+                    'label' => 'Solde',
+                    'data' => $soldes,
+                    'backgroundColor' => self::CHART_COLORS['primary'][0],
+                    'borderColor' => self::CHART_COLORS['primary'][1],
+                    'borderWidth' => 2,
+                    'borderRadius' => 6,
+                    'borderSkipped' => false,
                 ]
             ]
         ];
     }
     
-    private function getPerformanceStats()
+    // CHART 2: Doughnut Chart - Budget Category Distribution
+    private function loadDoughnutChart(): void
     {
-        $centres = collect($this->centresStats);
+        // Categorize by budget size
+        $categories = RessourceFinanciere::select([
+                DB::raw('CASE 
+                    WHEN total_recettes <= 50000 THEN "Petit Budget"
+                    WHEN total_recettes <= 200000 THEN "Moyen Budget"
+                    WHEN total_recettes <= 500000 THEN "Grand Budget"
+                    ELSE "Très Grand Budget"
+                END as categorie'),
+                DB::raw('COUNT(*) as count'),
+                DB::raw('SUM(total_recettes) as total_recettes'),
+                DB::raw('SUM(total_depenses) as total_depenses'),
+                DB::raw('SUM(total_recettes - total_depenses) as total_solde'),
+            ])
+            ->groupBy(DB::raw('CASE 
+                WHEN total_recettes <= 50000 THEN "Petit Budget"
+                WHEN total_recettes <= 200000 THEN "Moyen Budget"
+                WHEN total_recettes <= 500000 THEN "Grand Budget"
+                ELSE "Très Grand Budget"
+            END'))
+            ->orderBy('total_recettes', 'desc')
+            ->get();
         
-        return [
-            'labels' => ['Score Impact', 'Score Finance', 'Bénéficiaires', 'Solde Financier', 'Efficacité'],
-            'datasets' => $centres->take(3)->map(function($centre, $index) {
-                $colors = ['#FF6384', '#36A2EB', '#FFCE56'];
-                return [
-                    'label' => $centre['nom'],
-                    'data' => [
-                        $centre['score_impact'],
-                        $centre['score_finance'],
-                        min(100, $centre['total_beneficiaires'] / 10),
-                        min(100, max(0, $centre['solde'] / 10000)),
-                        $centre['taux_depenses'] > 0 ? min(100, 100 - $centre['taux_depenses']) : 0
+        $labels = $categories->pluck('categorie')->toArray();
+        $data = $categories->pluck('count')->map(fn($v) => (int) $v)->toArray();
+        $recettesData = $categories->pluck('total_recettes')->map(fn($v) => (float) $v)->toArray();
+        $soldeData = $categories->pluck('total_solde')->map(fn($v) => (float) $v)->toArray();
+        
+        $this->doughnutChart = [
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'Nombre d\'entrées',
+                    'data' => $data,
+                    'backgroundColor' => [
+                        self::CHART_COLORS['primary'][0],
+                        self::CHART_COLORS['success'][0],
+                        self::CHART_COLORS['warning'][0],
+                        self::CHART_COLORS['purple'][0],
                     ],
-                    'backgroundColor' => 'rgba(' . $this->hexToRgb($colors[$index]) . ', 0.2)',
-                    'borderColor' => $colors[$index],
-                    'pointBackgroundColor' => $colors[$index]
-                ];
-            })->toArray()
+                    'borderColor' => '#ffffff',
+                    'borderWidth' => 3,
+                    'hoverOffset' => 20,
+                ]
+            ],
+            'details' => [
+                'total_recettes' => $recettesData,
+                'total_solde' => $soldeData,
+            ]
         ];
     }
     
-    private function hexToRgb($hex)
+    // CHART 3: Pie Chart - Center Performance Distribution
+    private function loadPieChart(): void
     {
-        list($r, $g, $b) = sscanf($hex, "#%02x%02x%02x");
-        return "$r, $g, $b";
+        $centers = collect($this->centresStats);
+        
+        if ($centers->isEmpty()) {
+            $this->pieChart = [
+                'labels' => [],
+                'datasets' => []
+            ];
+            return;
+        }
+        
+        // Categorize centers by efficiency
+        $performanceCategories = [
+            'Excellente' => $centers->where('efficiency', '>', 20)->count(),
+            'Bonne' => $centers->whereBetween('efficiency', [10, 20])->count(),
+            'Moyenne' => $centers->whereBetween('efficiency', [0, 10])->count(),
+            'Déficitaire' => $centers->where('efficiency', '<', 0)->count(),
+        ];
+        
+        // Filter out empty categories
+        $performanceCategories = array_filter($performanceCategories);
+        
+        $this->pieChart = [
+            'labels' => array_keys($performanceCategories),
+            'datasets' => [
+                [
+                    'label' => 'Performance des Centres',
+                    'data' => array_values($performanceCategories),
+                    'backgroundColor' => [
+                        self::CHART_COLORS['success'][0], // Excellente
+                        self::CHART_COLORS['primary'][0], // Bonne
+                        self::CHART_COLORS['warning'][0], // Moyenne
+                        self::CHART_COLORS['danger'][0],  // Déficitaire
+                    ],
+                    'borderColor' => '#ffffff',
+                    'borderWidth' => 3,
+                    'hoverOffset' => 15,
+                ]
+            ]
+        ];
+    }
+    
+    // CHART 4: Line Chart - Trend Analysis
+    private function loadLineChart(): void
+    {
+        if (count($this->evolutionStats) === 0) {
+            $this->lineChart = [
+                'labels' => [],
+                'datasets' => []
+            ];
+            return;
+        }
+        
+        $labels = array_column($this->evolutionStats, 'annee');
+        $recettes = array_column($this->evolutionStats, 'total_recettes');
+        $depenses = array_column($this->evolutionStats, 'total_depenses');
+        $tauxDepenses = array_column($this->evolutionStats, 'taux_depenses');
+        
+        // Calculate moving averages for smoother trend lines
+        $movingAvgRecettes = $this->calculateMovingAverage($recettes, 2);
+        $movingAvgDepenses = $this->calculateMovingAverage($depenses, 2);
+        
+        $this->lineChart = [
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'Recettes (Réel)',
+                    'data' => $recettes,
+                    'borderColor' => self::CHART_COLORS['success'][1],
+                    'backgroundColor' => 'transparent',
+                    'borderWidth' => 3,
+                    'tension' => 0.4,
+                    'pointBackgroundColor' => self::CHART_COLORS['success'][0],
+                    'pointBorderColor' => '#ffffff',
+                    'pointBorderWidth' => 2,
+                    'pointRadius' => 5,
+                ],
+                [
+                    'label' => 'Recettes (Moyenne Mobile)',
+                    'data' => $movingAvgRecettes,
+                    'borderColor' => self::CHART_COLORS['success'][2],
+                    'borderDash' => [5, 5],
+                    'backgroundColor' => 'transparent',
+                    'borderWidth' => 2,
+                    'tension' => 0.4,
+                    'pointRadius' => 0,
+                ],
+                [
+                    'label' => 'Dépenses (Réel)',
+                    'data' => $depenses,
+                    'borderColor' => self::CHART_COLORS['danger'][1],
+                    'backgroundColor' => 'transparent',
+                    'borderWidth' => 3,
+                    'tension' => 0.4,
+                    'pointBackgroundColor' => self::CHART_COLORS['danger'][0],
+                    'pointBorderColor' => '#ffffff',
+                    'pointBorderWidth' => 2,
+                    'pointRadius' => 5,
+                ],
+                [
+                    'label' => 'Dépenses (Moyenne Mobile)',
+                    'data' => $movingAvgDepenses,
+                    'borderColor' => self::CHART_COLORS['danger'][2],
+                    'borderDash' => [5, 5],
+                    'backgroundColor' => 'transparent',
+                    'borderWidth' => 2,
+                    'tension' => 0.4,
+                    'pointRadius' => 0,
+                ],
+                [
+                    'label' => 'Taux de Dépenses',
+                    'data' => $tauxDepenses,
+                    'borderColor' => self::CHART_COLORS['warning'][1],
+                    'backgroundColor' => 'transparent',
+                    'borderWidth' => 2,
+                    'tension' => 0.4,
+                    'yAxisID' => 'y1',
+                    'pointStyle' => 'circle',
+                    'pointRadius' => 3,
+                    'pointBackgroundColor' => self::CHART_COLORS['warning'][0],
+                ]
+            ]
+        ];
+    }
+    
+    private function calculatePercentage(float $value, float $total, int $decimals = 1): float
+    {
+        if ($total <= 0) {
+            return 0.0;
+        }
+        
+        return round(($value / $total) * 100, $decimals);
+    }
+    
+    private function calculateMovingAverage(array $data, int $window = 2): array
+    {
+        $result = [];
+        $count = count($data);
+        
+        for ($i = 0; $i < $count; $i++) {
+            $start = max(0, $i - $window);
+            $end = min($count - 1, $i + $window);
+            $slice = array_slice($data, $start, $end - $start + 1);
+            $result[] = array_sum($slice) / count($slice);
+        }
+        
+        return $result;
     }
 
     public function render()

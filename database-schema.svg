@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1100" viewBox="0 0 1400 1100">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333" />
+    </marker>
+    <style>
+      .table { fill:#fff; stroke:#111827; stroke-width:1.2; rx:8; }
+      .title { font: 600 14px/1.2 'Segoe UI', Roboto, sans-serif; fill:#111827; }
+      .col { font: 12px/1.2 'Segoe UI', Roboto, sans-serif; fill:#374151; }
+      .pk { font-weight:700; }
+      .fk { fill:#0b74de; }
+      .note { font:12px/1.2 'Segoe UI', Roboto, sans-serif; fill:#6b7280; }
+    </style>
+  </defs>
+
+  <!-- Row 1 -->
+  <g transform="translate(20,20)">
+    <rect class="table" width="260" height="140"></rect>
+    <text class="title" x="14" y="26">users</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">name, email (unique)</text>
+    <text class="col" x="14" y="84">password, phone, position, is_active</text>
+    <text class="col" x="14" y="102">last_login_at, timestamps</text>
+  </g>
+
+  <g transform="translate(320,20)">
+    <rect class="table" width="380" height="260"></rect>
+    <text class="title" x="14" y="26">associations</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">nom_de_l_asso, nom_asso_ar</text>
+    <text class="col" x="14" y="84">adresse, jeagraphie, date_de_creation</text>
+    <text class="col" x="14" y="102">tel, email, site_web</text>
+    <text class="col" x="14" y="120">statut_juridique, numero_agrement, date_agrement</text>
+    <text class="col" x="14" y="138">domaine_activite, budget_annuel, nombre_employes</text>
+    <text class="col fk" x="14" y="156">secteur_id (FK → secteurs.id)</text>
+    <text class="col fk" x="14" y="174">districts_id (FK → districts.id)</text>
+    <text class="col fk" x="14" y="192">created_by (FK → users.id)</text>
+    <text class="col" x="14" y="210">president_name, president_email, president_cin</text>
+  </g>
+
+  <g transform="translate(740,20)">
+    <rect class="table" width="300" height="140"></rect>
+    <text class="title" x="14" y="26">centres</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">denomination, domaine_intervention</text>
+    <text class="col" x="14" y="84">localisation, superficie</text>
+    <text class="col" x="14" y="102">objectifs, composantes, couts, timestamps</text>
+  </g>
+
+  <g transform="translate(1080,20)">
+    <rect class="table" width="280" height="120"></rect>
+    <text class="title" x="14" y="26">association_centre</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">association_id (FK → associations.id)</text>
+    <text class="col fk" x="14" y="84">centre_id (FK → centres.id)</text>
+  </g>
+
+  <!-- Row 2 -->
+  <g transform="translate(20,220)">
+    <rect class="table" width="280" height="120"></rect>
+    <text class="title" x="14" y="26">secteurs</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">nom_secteur_fr, nom_secteur_ar</text>
+    <text class="col" x="14" y="84">description, is_active, timestamps</text>
+  </g>
+
+  <g transform="translate(320,220)">
+    <rect class="table" width="320" height="140"></rect>
+    <text class="title" x="14" y="26">districts</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">nom_district_fr, nom_district_ar</text>
+    <text class="col" x="14" y="84">region, description, is_active</text>
+    <text class="col" x="14" y="102">timestamps</text>
+  </g>
+
+  <g transform="translate(680,220)">
+    <rect class="table" width="360" height="140"></rect>
+    <text class="title" x="14" y="26">dossiers</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">title, description, reference (unique), status</text>
+    <text class="col fk" x="14" y="84">created_by (FK → users.id)</text>
+    <text class="col fk" x="14" y="102">assigned_to (FK → users.id)</text>
+    <text class="col fk" x="14" y="120">association_id (FK → associations.id)</text>
+  </g>
+
+  <!-- Row 3 -->
+  <g transform="translate(20,420)">
+    <rect class="table" width="320" height="140"></rect>
+    <text class="title" x="14" y="26">documents</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">dossier_id (FK → dossiers.id)</text>
+    <text class="col" x="14" y="84">name, file_path, file_size</text>
+    <text class="col" x="14" y="102">mime_type, description, version</text>
+    <text class="col fk" x="14" y="120">uploaded_by (FK → users.id)</text>
+  </g>
+
+  <g transform="translate(360,420)">
+    <rect class="table" width="320" height="140"></rect>
+    <text class="title" x="14" y="26">gestionnaires</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">centre_id (FK → centres.id)</text>
+    <text class="col" x="14" y="84">association, recepisse_definitif</text>
+    <text class="col" x="14" y="102">liste_membres (json), liasse_fiscale, timestamps</text>
+  </g>
+
+  <g transform="translate(720,420)">
+    <rect class="table" width="320" height="140"></rect>
+    <text class="title" x="14" y="26">ressource_humaines</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">centre_id (FK → centres.id)</text>
+    <text class="col" x="14" y="84">poste, nom_prenom, salaire</text>
+    <text class="col" x="14" y="102">type_contrat, timestamps</text>
+  </g>
+
+  <g transform="translate(1080,420)">
+    <rect class="table" width="300" height="120"></rect>
+    <text class="title" x="14" y="26">ressource_financieres</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">centre_id (FK → centres.id)</text>
+    <text class="col" x="14" y="84">budget_annee, total_depenses, total_recettes</text>
+    <text class="col" x="14" y="102">timestamps</text>
+  </g>
+
+  <!-- Row 4: Impact tables + partenaires -->
+  <g transform="translate(20,640)">
+    <rect class="table" width="420" height="160"></rect>
+    <text class="title" x="14" y="26">impact_beneficiaires</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">centre_id (FK → centres.id)</text>
+    <text class="col" x="14" y="84">domaine, intitule_filiere_discipline</text>
+    <text class="col" x="14" y="102">nombre_inscrits_hommes, nombre_inscrits_femmes</text>
+    <text class="col" x="14" y="120">heures_par_beneficiaire, annee, masse_salariale, charges_globales</text>
+    <text class="col" x="14" y="138">timestamps, indexes</text>
+  </g>
+
+  <g transform="translate(460,640)">
+    <rect class="table" width="300" height="120"></rect>
+    <text class="title" x="14" y="26">impact_animations</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">impact_beneficiaire_id (FK → impact_beneficiaires.id)</text>
+    <text class="col" x="14" y="84">nombre_disciplines, nombre_evenements_organises, ...</text>
+    <text class="col" x="14" y="102">timestamps</text>
+  </g>
+
+  <g transform="translate(780,640)">
+    <rect class="table" width="300" height="120"></rect>
+    <text class="title" x="14" y="26">impact_handicaps</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">impact_beneficiaire_id (FK → impact_beneficiaires.id)</text>
+    <text class="col" x="14" y="84">nombre_handicaps_traites, heures_medecin_an, ...</text>
+    <text class="col" x="14" y="102">timestamps</text>
+  </g>
+
+  <g transform="translate(1100,640)">
+    <rect class="table" width="260" height="120"></rect>
+    <text class="title" x="14" y="26">impact_eps</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">impact_beneficiaire_id (FK → impact_beneficiaires.id)</text>
+    <text class="col" x="14" y="84">nombre_handicaps_traites, heures_medecin_an, ...</text>
+    <text class="col" x="14" y="102">timestamps</text>
+  </g>
+
+  <g transform="translate(20,840)">
+    <rect class="table" width="420" height="120"></rect>
+    <text class="title" x="14" y="26">impact_formation_pros</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">impact_beneficiaire_id (FK → impact_beneficiaires.id)</text>
+    <text class="col" x="14" y="84">nombre_filieres, nombre_laureats, taux_insertion_professionnelle</text>
+    <text class="col" x="14" y="102">moyenne_premier_salaire, timestamps</text>
+  </g>
+
+  <g transform="translate(460,840)">
+    <rect class="table" width="320" height="120"></rect>
+    <text class="title" x="14" y="26">partenaires</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col fk" x="14" y="66">impact_beneficiaire_id (FK → impact_beneficiaires.id)</text>
+    <text class="col" x="14" y="84">nom, type, contact_nom, contact_telephone, contact_email</text>
+    <text class="col" x="14" y="102">timestamps</text>
+  </g>
+
+  <!-- System settings -->
+  <g transform="translate(820,840)">
+    <rect class="table" width="360" height="120"></rect>
+    <text class="title" x="14" y="26">system_settings</text>
+    <text class="col pk" x="14" y="48">id (PK)</text>
+    <text class="col" x="14" y="66">key (unique), value, type</text>
+    <text class="col" x="14" y="84">group, description, is_public</text>
+    <text class="col fk" x="14" y="102">updated_by (FK → users.id)</text>
+  </g>
+
+  <!-- Relationship arrows (representative) -->
+  <line x1="560" y1="220" x2="220" y2="120" stroke="#333" stroke-width="1.4" marker-end="url(#arrow)" />
+  <line x1="560" y1="240" x2="420" y2="300" stroke="#333" stroke-width="1.4" marker-end="url(#arrow)" />
+  <line x1="740" y1="160" x2="980" y2="160" stroke="#333" stroke-width="1.4" marker-end="url(#arrow)" />
+  <line x1="420" y1="320" x2="420" y2="420" stroke="#333" stroke-width="1.4" marker-end="url(#arrow)" />
+  <line x1="420" y1="460" x2="420" y2="540" stroke="#333" stroke-width="1.4" marker-end="url(#arrow)" />
+
+  <g transform="translate(20,1000)">
+    <text class="note" x="0" y="0">Legend:</text>
+    <text class="note" x="0" y="18">PK = Primary Key, FK = Foreign Key</text>
+  </g>
+</svg>

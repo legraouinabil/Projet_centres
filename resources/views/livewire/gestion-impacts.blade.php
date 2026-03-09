@@ -10,7 +10,7 @@
                 indicateurs clés.
             </p>
         </div>
-        <div class="mt-4 sm:mt-0">
+        <div class="mt-4 sm:mt-0 flex items-center gap-2">
             <button wire:click="$set('showForm', true)"
                 class="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200">
                 <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -20,8 +20,36 @@
                 Ajouter un impact
 
             </button>
+
+            <a href="{{ route('impacts.export.list', ['search' => $search, 'centre_id' => $centre_id, 'domaine' => $domaine, 'annee' => $annee]) }}" target="_blank"
+                class="inline-flex items-center justify-center px-4 py-2 border border-red-600 shadow-sm text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-all duration-200">
+                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10v6h-4v4H7z" />
+                </svg>
+                Exporter (PDF)
+            </a>
         </div>
     </div>
+
+    <!-- Success Flash (session or Livewire public property) -->
+    @if (session()->has('success') || !empty($successMessage))
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => { show = false; Livewire.emit('clearSuccess'); }, 3000)"
+            class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
+            {{ session('success') ?? $successMessage }}
+        </div>
+    @endif
+
+    <!-- Global Loading Overlay (Livewire requests + full page reloads) -->
+    <div id="global-spinner" wire:loading.class.remove="hidden" class="hidden flex items-center justify-center fixed inset-0 z-50 bg-gray-900/60">
+        <div class="flex flex-col items-center gap-2">
+            <svg class="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span class="text-white text-sm">Chargement...</span>
+        </div>
+    </div>
+
     <!-- Statistiques (Style Cartes épurées) -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
@@ -241,6 +269,7 @@
                                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                 </button> <!-- Edit -->
+                                <!-- export removed: use top Exporter (PDF) button to export filtered list -->
                                 <button wire:click="editImpact({{ $impact->id }})"
                                     class="text-emerald-600 hover:text-emerald-900 transition-colors"
                                     title="Modifier">
@@ -623,6 +652,14 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-3">
+                            <a href="{{ route('impacts.export', $this->selectedImpact->id) }}" target="_blank"
+                                class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-colors">
+                                <svg class="w-4 h-4 mr-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h6l5 5v6a2 2 0 01-2 2H7a2 2 0 01-2-2V7z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 3v5a1 1 0 001 1h5" />
+                                </svg>
+                                Exporter PDF
+                            </a>
                             <button wire:click="editImpact({{ $this->selectedImpact->id }})"
                                 class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
                                 <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor"
@@ -938,18 +975,98 @@
                     Centre: {{ $this->selectedImpact->centre->denomination }}<br>
                     Filière/Discipline: {{ $this->selectedImpact->intitule_filiere_discipline }}
                 </p>
-                <div class="text-center py-8">
-                    <p class="text-gray-500">Fonctionnalité de gestion des partenaires à implémenter</p>
-                </div>
+                <!-- Formulaire d'ajout de partenaire (placé avant la liste) -->
+                <form wire:submit.prevent="savePartenaire" class="space-y-4 bg-gray-50 p-4 rounded-md mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-3">
+                            <label class="block text-sm font-medium text-gray-700">Nom du partenaire *</label>
+                            <input type="text" wire:model.defer="partenaire_nom"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            @error('partenaire_nom') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Événements</label>
+                            <input type="number" wire:model.defer="partenaire_evenements"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            @error('partenaire_evenements') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Participations</label>
+                            <input type="number" wire:model.defer="partenaire_participations"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            @error('partenaire_participations') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Trophées</label>
+                            <input type="number" wire:model.defer="partenaire_trophies"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            @error('partenaire_trophies') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="submit"
+                                class="inline-flex items-center justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                            Ajouter
+                        </button>
+                        <button type="button" wire:click="resetPartenaireForm"
+                                class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                            Réinitialiser
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Liste des partenaires pour cet impact -->
+                @if($this->selectedImpact->partenaires && $this->selectedImpact->partenaires->count())
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Nom</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Créé</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-100">
+                                @foreach($this->selectedImpact->partenaires as $p)
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-3">{{ $p->nom }}</td>
+                                        <td class="px-4 py-3"><span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">{{ $p->type_label }}</span></td>
+                                        <td class="px-4 py-3">{{ $p->created_at->format('d/m/Y') }}</td>
+                                        <td class="px-4 py-3 text-right">
+                                            <button wire:click="deletePartenaire({{ $p->id }})" onclick="return confirm('Supprimer ce partenaire ?')"
+                                                    class="text-red-600 hover:text-red-800 text-sm">Supprimer</button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="text-sm text-gray-500">Aucun partenaire pour cet impact.</p>
+                @endif
             </div>
         </div>
     @endif
 
-    <!-- Messages Flash -->
-    @if (session()->has('success'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)"
-            class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
-            {{ session('success') }}
-        </div>
-    @endif
+      
+
+    <script>
+        (function () {
+            var spinner = document.getElementById('global-spinner');
+            // Show spinner on full page unload/navigation
+            window.addEventListener('beforeunload', function () {
+                if (spinner) spinner.classList.remove('hidden');
+            });
+            // Ensure spinner is hidden when arriving on the page (bfcache / back button)
+            window.addEventListener('pageshow', function () {
+                if (spinner) spinner.classList.add('hidden');
+            });
+            // Defensive hide on DOM ready
+            document.addEventListener('DOMContentLoaded', function () {
+                if (spinner) spinner.classList.add('hidden');
+            });
+        })();
+    </script>
 </div>
